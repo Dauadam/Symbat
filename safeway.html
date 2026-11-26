@@ -1,0 +1,624 @@
+<title>SafeWay Kids</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&display=swap">
+<style>
+/* Layout: demo control bar on top, centered 390x844 phone below. Friendly teal + coral palette. */
+:root{
+  --page:#E6EEF2; --panel:#FFFFFF; --ink:#173042; --muted:#5E7587;
+  --brand:#139A8A; --brand-soft:#D9F2EE; --coral:#F26B5B; --sun:#F4B73F;
+  --safe:#2FB26B; --warn:#F2B01E; --danger:#E5483A;
+  --font:'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--page:#0F1A22;--panel:#1B2A35;--ink:#E7F0F5;--muted:#9BB0BE;color-scheme:dark}}
+:root[data-theme="dark"]{--page:#0F1A22;--panel:#1B2A35;--ink:#E7F0F5;--muted:#9BB0BE;color-scheme:dark}
+body{background:var(--page);color:var(--ink);font-family:var(--font);margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:16px;font-size:14px}
+#root{display:flex;flex-direction:column;align-items:center;gap:14px}
+.demo-bar{width:100%;max-width:560px;background:var(--panel);border-radius:18px;padding:10px 12px;
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(23,48,66,.12)}
+.seg{display:inline-flex;background:var(--page);border-radius:12px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--muted);font:700 12px var(--font);padding:7px 11px;border-radius:9px;cursor:pointer}
+.seg button.on{background:var(--brand);color:#fff}
+.go{border:0;background:var(--coral);color:#fff;font:800 12px var(--font);padding:9px 14px;border-radius:12px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.go.stop{background:var(--ink)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.phone{width:390px;height:844px;max-width:100%;flex:none;background:#F7FAFB;color:#173042;border-radius:44px;
+  border:10px solid #0E1B24;box-shadow:0 18px 50px rgba(8,20,30,.35);position:relative;overflow:hidden;display:flex;flex-direction:column;box-sizing:content-box}
+.phone *{box-sizing:border-box}
+.phone-in{width:390px;max-width:100%}
+.statusbar{height:34px;flex:none;display:flex;justify-content:space-between;align-items:center;padding:6px 26px 0;font-weight:800;font-size:12px}
+.scroll{flex:1;overflow-y:auto;padding:4px 14px 14px;min-height:0}
+.card{background:#fff;border-radius:20px;padding:12px 14px;box-shadow:0 1px 6px rgba(23,48,66,.09)}
+.tabbar{flex:none;display:flex;background:#fff;border-top:1px solid #E3ECEF;padding:6px 8px 10px}
+.tabbar button{flex:1;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;font:700 11px var(--font);color:#7C93A3;padding:6px 0;border-radius:12px;cursor:pointer}
+.tabbar button.on{color:#139A8A;background:#E5F6F3}
+.chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 9px;font-weight:800;font-size:11px}
+.toast{position:absolute;left:10px;right:10px;top:38px;z-index:40;border-radius:18px;padding:11px 13px;color:#fff;display:flex;gap:10px;align-items:flex-start;
+  box-shadow:0 10px 26px rgba(0,0,0,.28);animation:drop .35s ease-out}
+@keyframes drop{from{transform:translateY(-70px);opacity:0}to{transform:none;opacity:1}}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(229,72,58,.65)}70%{box-shadow:0 0 0 26px rgba(229,72,58,0)}100%{box-shadow:0 0 0 0 rgba(229,72,58,0)}}
+.sos{animation:pulse 1.5s infinite}
+@keyframes blink{50%{opacity:.35}}
+.blink{animation:blink 1s infinite}
+.dash{stroke-dasharray:6 5}
+.flow{stroke-dasharray:9 7;animation:flow 1.2s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-32}}
+.overlay{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:26px;text-align:center;color:#fff}
+input{font:600 14px var(--font);border:2px solid #D4E2E8;border-radius:12px;padding:10px 12px;width:100%;background:#fff;color:#173042}
+@media (prefers-reduced-motion: reduce){.sos,.blink,.flow,.toast{animation:none}}
+</style>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo } = React;
+
+/* Lucide-style icons (same 24px stroke geometry as lucide-react), inlined because the artifact cannot import packages */
+const P = {
+  shield:["M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"],
+  map:["M14.1 5.55a2 2 0 0 0 1.8 0l3.65-1.83A1 1 0 0 1 21 4.62v12.76a1 1 0 0 1-.55.9l-4.55 2.27a2 2 0 0 1-1.79 0l-4.21-2.1a2 2 0 0 0-1.79 0l-3.66 1.83A1 1 0 0 1 3 19.38V6.62a1 1 0 0 1 .55-.9l4.55-2.28a2 2 0 0 1 1.79 0z","M15 5.76v15","M9 3.24v15"],
+  pin:["M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z","M12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"],
+  bell:["M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9","M10.3 21a1.94 1.94 0 0 0 3.4 0"],
+  phone:["M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"],
+  plus:["M5 12h14","M12 5v14"],
+  play:["M6 3l14 9-14 9z"],
+  stop:["M6 6h12v12H6z"],
+  check:["M20 6 9 17l-5-5"],
+  x:["M18 6 6 18","M6 6l12 12"],
+  battery:["M17 6H3a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z","M23 13v-2","M5 10v4","M9 10v4"],
+  alert:["M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3","M12 9v4","M12 17h.01"],
+  user:["M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2","M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"],
+  bulb:["M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5","M9 18h6","M10 22h4"],
+  clock:["M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z","M12 6v6l4 2"],
+  cam:["M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z","M12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"],
+  walk:["M13 4a1 1 0 1 0 0 .01","M7 21l3-6 2 2v5","M10 15l1-5 4 3 3 1","M11 10l-3 2-2 3"],
+  list:["M8 6h13","M8 12h13","M8 18h13","M3 6h.01","M3 12h.01","M3 18h.01"],
+  home:["M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z","M9 22V12h6v10"],
+  school:["M22 10 12 5 2 10l10 5z","M6 12v5c3 3 9 3 12 0v-5"],
+  nav:["M3 11l19-9-9 19-2-8-8-2z"],
+  heart:["M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"]
+};
+const Icon = ({ n, size = 18, className = "", fill = "none", sw = 2 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth={sw}
+       strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    {P[n].map((d, i) => <path key={i} d={d} />)}
+  </svg>
+);
+
+/* ---------- i18n ---------- */
+const T = {
+  ru: {
+    parent:"Режим Родителя", child:"Режим Ребёнка", run:"Запустить движение", stop:"Остановить",
+    tabMap:"Карта", tabEvents:"События", tabContacts:"Контакты",
+    mapTitle:"Карта безопасности", status:"Идёт домой", statusIdle:"На месте", battery:"Заряд",
+    home:"Дом", school:"Школа", park:"Парк", yard:"Двор", crossing:"Перекрёсток", wasteland:"Пустырь",
+    zSafe:"Безопасная зона", zWarn:"Оживлённый перекрёсток", zDanger:"Опасная зона",
+    fast:"Быстрый путь", safeRoute:"AI Safe Route", min:"мин", routeFrom:"Маршрут: Школа → Дом",
+    aiTitle:"ИИ-анализ маршрута", aiSafe:"Выбран безопасный маршрут: он обходит пустырь, на 3 минуты дольше.",
+    aiFast:"Быстрый путь проходит вплотную к красной зоне. Рекомендуем AI Safe Route.",
+    light:"Освещение", lightV:"98% пути освещено", cam:"Камеры наблюдения", camV:"7 камер вдоль улицы", ped:"Пешеходный трафик", pedV:"Много прохожих, 4 магазина",
+    lightF:"Тёмный участок 180 м", camF:"Камер нет у пустыря", pedF:"Малолюдно",
+    simTitle:"Симуляция событий", e1:"Вход в красную зону", e2:"Отклонение от маршрута", e3:"Выход из безопасной зоны", e4:"Прибытие в школу (Safe Arrival)",
+    n1:"Ребёнок вошёл в красную зону (пустырь). Проверьте местоположение.", n2:"Ребёнок отклонился от маршрута более чем на 150 м.", n3:"Ребёнок вышел за пределы безопасной зоны.",
+    n4:"Ваш ребёнок благополучно добрался до места назначения",
+    t1:"Красная зона", t2:"Отклонение", t3:"Выход из зоны", t4:"Safe Arrival",
+    history:"История уведомлений", empty:"Пока нет событий. Нажмите кнопку симуляции выше.",
+    contacts:"Экстренные контакты", mom:"Мама", dad:"Папа", grandma:"Бабушка", emergency:"Служба спасения",
+    call:"Позвонить", calling:"Вызов", callingSub:"Соединяем…", end:"Завершить", addTitle:"Добавить номер", name:"Имя", phone:"Телефон", add:"Добавить", nameReq:"Введите имя и телефон",
+    childHello:"Привет, Алия!", childSub:"Твой безопасный путь домой", callParents:"Позвонить",
+    sosHold:"Нажми, если тебе страшно", sosOn:"ВЫЗОВ ОТПРАВЛЕН", sosKid:"Родители уже получили твои координаты. Оставайся на месте.", cancel:"Отменить вызов",
+    sosAlert:"ТРЕВОГА: SOS", sosBody:"Ребёнок нажал кнопку SOS", coords:"GPS-координаты", time:"Время вызова", ack:"Принять и позвонить",
+    now:"сейчас", child_name:"Алия", moving:"В пути"
+  },
+  kk: {
+    parent:"Ата-ана режимі", child:"Бала режимі", run:"Қозғалысты бастау", stop:"Тоқтату",
+    tabMap:"Карта", tabEvents:"Оқиғалар", tabContacts:"Байланыс",
+    mapTitle:"Қауіпсіздік картасы", status:"Үйге бара жатыр", statusIdle:"Орнында", battery:"Заряд",
+    home:"Үй", school:"Мектеп", park:"Саябақ", yard:"Аула", crossing:"Қиылыс", wasteland:"Бос алаң",
+    zSafe:"Қауіпсіз аймақ", zWarn:"Жүрісі көп қиылыс", zDanger:"Қауіпті аймақ",
+    fast:"Жылдам жол", safeRoute:"AI Safe Route", min:"мин", routeFrom:"Бағыт: Мектеп → Үй",
+    aiTitle:"ЖИ бағыт талдауы", aiSafe:"Қауіпсіз бағыт таңдалды: ол бос алаңды айналып өтеді, 3 минутқа ұзағырақ.",
+    aiFast:"Жылдам жол қызыл аймаққа тым жақын өтеді. AI Safe Route ұсынамыз.",
+    light:"Жарық", lightV:"Жолдың 98%-ы жарық", cam:"Бейнебақылау камералары", camV:"Көшеде 7 камера", ped:"Жаяу жүргіншілер", pedV:"Адам көп, 4 дүкен",
+    lightF:"180 м қараңғы учаске", camF:"Бос алаңда камера жоқ", pedF:"Адам аз",
+    simTitle:"Оқиғаларды симуляциялау", e1:"Қызыл аймаққа кіру", e2:"Бағыттан ауытқу", e3:"Қауіпсіз аймақтан шығу", e4:"Мектепке келу (Safe Arrival)",
+    n1:"Бала қызыл аймаққа (бос алаң) кірді. Орнын тексеріңіз.", n2:"Бала бағыттан 150 м-ден астам ауытқыды.", n3:"Бала қауіпсіз аймақтан шығып кетті.",
+    n4:"Балаңыз межелі жерге аман-есен жетті",
+    t1:"Қызыл аймақ", t2:"Ауытқу", t3:"Аймақтан шығу", t4:"Safe Arrival",
+    history:"Хабарламалар тарихы", empty:"Әзірге оқиға жоқ. Жоғарыдағы симуляция түймесін басыңыз.",
+    contacts:"Шұғыл байланыстар", mom:"Анам", dad:"Әкем", grandma:"Әжем", emergency:"Құтқару қызметі",
+    call:"Қоңырау шалу", calling:"Қоңырау", callingSub:"Қосылып жатыр…", end:"Аяқтау", addTitle:"Нөмір қосу", name:"Аты", phone:"Телефон", add:"Қосу", nameReq:"Аты мен телефонды енгізіңіз",
+    childHello:"Сәлем, Алия!", childSub:"Үйге қауіпсіз жолың", callParents:"Қоңырау шалу",
+    sosHold:"Қорықсаң, басыңыз", sosOn:"ШАҚЫРУ ЖІБЕРІЛДІ", sosKid:"Ата-анаң координаталарыңды алды. Орнында тұр.", cancel:"Шақыруды болдырмау",
+    sosAlert:"ДАБЫЛ: SOS", sosBody:"Бала SOS түймесін басты", coords:"GPS-координаталар", time:"Шақыру уақыты", ack:"Қабылдау және қоңырау шалу",
+    now:"қазір", child_name:"Алия", moving:"Жолда"
+  }
+};
+
+/* ---------- Map data ---------- */
+const HOME = [320, 330], SCHOOL = [60, 70];
+const ROUTES = {
+  fast: { pts: [[60,70],[60,150],[150,150],[150,250],[250,250],[250,330],[320,330]], min: 12 },
+  safe: { pts: [[60,70],[250,70],[320,70],[320,150],[320,250],[320,330]], min: 15 }
+};
+const polyD = pts => "M" + pts.map(p => p.join(",")).join(" L");
+function pointAt(pts, k) {
+  const segs = []; let total = 0;
+  for (let i = 1; i < pts.length; i++) { const l = Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]); segs.push(l); total += l; }
+  let d = Math.max(0, Math.min(1, k)) * total;
+  for (let i = 0; i < segs.length; i++) {
+    if (d <= segs[i] || i === segs.length - 1) {
+      const f = segs[i] ? d / segs[i] : 0;
+      return { x: pts[i][0] + (pts[i+1][0]-pts[i][0]) * f, y: pts[i][1] + (pts[i+1][1]-pts[i][1]) * f };
+    }
+    d -= segs[i];
+  }
+  return { x: pts[0][0], y: pts[0][1] };
+}
+
+const XS = [0, 60, 150, 250, 320, 390], YS = [0, 70, 150, 250, 330, 400];
+const BCOL = ["#C9D8E2", "#D6CFE6", "#E6D5C3", "#CFE0D3", "#E3D0D8"];
+
+function Buildings() {
+  const out = [];
+  for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+    if ((i === 1 && j === 2) || (i === 2 && j === 2)) continue; // park + wasteland cells
+    const x0 = XS[i] + 14, x1 = XS[i+1] - 14, y0 = YS[j] + 14, y1 = YS[j+1] - 14;
+    if (x1 - x0 < 8 || y1 - y0 < 8) continue;
+    const c = BCOL[(i * 2 + j * 3) % 5], w = x1 - x0, h = y1 - y0;
+    if (w > 60 && h > 40) {
+      out.push(<rect key={`a${i}${j}`} x={x0} y={y0} width={w * 0.46} height={h} rx="5" fill={c} />);
+      out.push(<rect key={`b${i}${j}`} x={x0 + w * 0.54} y={y0} width={w * 0.46} height={h * 0.62} rx="5" fill={BCOL[(i + j + 1) % 5]} />);
+    } else out.push(<rect key={`c${i}${j}`} x={x0} y={y0} width={w} height={h} rx="5" fill={c} />);
+  }
+  return <g opacity="0.95">{out}</g>;
+}
+
+function SafeMap({ t, route, pos, compact, onZone, showBubble, battery, moving, danger }) {
+  const sel = ROUTES[route];
+  const zone = (k, label, el) => (
+    <g onClick={() => onZone && onZone(k)} style={{ cursor: "pointer" }}>{el}</g>
+  );
+  return (
+    <svg viewBox="0 0 390 400" className="w-full block" role="img" aria-label={t.mapTitle} style={{ background: "#EEF3EA" }}>
+      {/* streets */}
+      {YS.slice(1, 5).map(y => <g key={"h"+y}><rect x="0" y={y-8} width="390" height="16" fill="#fff" /><line x1="0" x2="390" y1={y} y2={y} stroke="#DDE5EA" strokeWidth="1.5" strokeDasharray="8 6" /></g>)}
+      {XS.slice(1, 5).map(x => <g key={"v"+x}><rect x={x-8} y="0" width="16" height="400" fill="#fff" /><line y1="0" y2="400" x1={x} x2={x} stroke="#DDE5EA" strokeWidth="1.5" strokeDasharray="8 6" /></g>)}
+      <Buildings />
+      {/* park */}
+      <rect x="76" y="166" width="58" height="68" rx="10" fill="#9AD6A4" />
+      {[[92,184],[116,196],[96,216],[118,222]].map((c, i) => <circle key={i} cx={c[0]} cy={c[1]} r="7" fill="#4FAE67" />)}
+      <ellipse cx="105" cy="204" rx="9" ry="6" fill="#8FD0E8" />
+      {/* wasteland / industrial */}
+      <rect x="166" y="166" width="68" height="68" fill="#CDBFAE" />
+      {[0,1,2,3,4,5].map(i => <line key={i} x1="166" y1={176 + i * 11} x2={234 - (i % 2) * 14} y2={166 + i * 11 + 6} stroke="#B3A38F" strokeWidth="1.5" />)}
+      <rect x="176" y="178" width="22" height="14" fill="#A99884" /><rect x="206" y="208" width="20" height="16" fill="#9E8E7B" />
+      {/* safety zones */}
+      {zone("park", t.zSafe, <rect x="70" y="160" width="70" height="80" rx="14" fill="#2FB26B" fillOpacity="0.28" stroke="#2FB26B" strokeWidth="2" />)}
+      {zone("yard", t.zSafe, <circle cx={HOME[0]} cy={HOME[1]} r="58" fill="#2FB26B" fillOpacity="0.26" stroke="#2FB26B" strokeWidth="2" />)}
+      {zone("cross", t.zWarn, <circle cx="320" cy="150" r="36" fill="#F2B01E" fillOpacity="0.34" stroke="#E0A010" strokeWidth="2" />)}
+      {zone("danger", t.zDanger, <rect x="156" y="156" width="88" height="88" rx="10" fill="#E5483A" fillOpacity={danger ? 0.5 : 0.34} stroke="#E5483A" strokeWidth="2.5" className={danger ? "blink" : ""} />)}
+      {/* geofences */}
+      <circle cx={HOME[0]} cy={HOME[1]} r="44" fill="none" stroke="#139A8A" strokeWidth="2.5" className="dash" />
+      <circle cx={SCHOOL[0]} cy={SCHOOL[1]} r="44" fill="none" stroke="#139A8A" strokeWidth="2.5" className="dash" />
+      {/* routes */}
+      {["fast", "safe"].map(k => {
+        const on = k === route;
+        return <path key={k} d={polyD(ROUTES[k].pts)} fill="none" strokeLinecap="round" strokeLinejoin="round"
+          stroke={k === "safe" ? "#139A8A" : "#F26B5B"} strokeWidth={on ? 6 : 3} opacity={on ? 1 : 0.35}
+          className={on ? "flow" : ""} strokeDasharray={on ? undefined : "4 6"} />;
+      })}
+      {/* labels */}
+      <g fontWeight="800" fontSize="10" fill="#173042" textAnchor="middle">
+        <text x="105" y="252" opacity="0.9">{t.park}</text>
+        <text x="200" y="258" fill="#A12B20">{t.wasteland}</text>
+        <text x="320" y="106" fill="#8A5E00">{t.crossing}</text>
+        <text x="342" y="394">{t.yard}</text>
+      </g>
+      {/* home + school */}
+      <g>
+        <circle cx={HOME[0]} cy={HOME[1]} r="15" fill="#fff" stroke="#139A8A" strokeWidth="3" />
+        <g transform={`translate(${HOME[0]-8},${HOME[1]-8})`} stroke="#139A8A" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 7l7-5.5L15 7v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z" /></g>
+        <text x={HOME[0]} y={HOME[1]+30} textAnchor="middle" fontSize="11" fontWeight="800" fill="#0B6B5F">{t.home}</text>
+        <circle cx={SCHOOL[0]} cy={SCHOOL[1]} r="15" fill="#fff" stroke="#F4B73F" strokeWidth="3" />
+        <g transform={`translate(${SCHOOL[0]-8},${SCHOOL[1]-8})`} stroke="#B07A00" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 6.5 8 3 0 6.5 8 10z" /><path d="M3 8.5v4c2 2.2 8 2.2 10 0v-4" /></g>
+        <text x={SCHOOL[0]} y={SCHOOL[1]+30} textAnchor="middle" fontSize="11" fontWeight="800" fill="#8A5E00">{t.school}</text>
+      </g>
+      {/* child marker */}
+      <g transform={`translate(${pos.x},${pos.y})`} style={{ transition: moving ? "none" : "transform .6s ease" }}>
+        <circle r="20" fill="#139A8A" opacity="0.22" className={moving ? "blink" : ""} />
+        <circle r="12" fill="#139A8A" stroke="#fff" strokeWidth="3" />
+        <text y="4" textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">{t.child_name[0]}</text>
+        {showBubble && (
+          <g transform={`translate(${pos.x > 250 ? -108 : 18},${pos.y < 60 ? 8 : -46})`}>
+            <rect width="92" height="36" rx="10" fill="#173042" />
+            <text x="8" y="14" fontSize="10" fontWeight="800" fill="#fff">{t.child_name} · {moving ? t.moving : t.statusIdle}</text>
+            <text x="8" y="28" fontSize="10" fontWeight="700" fill="#8EE3D6">{battery}% {t.battery.toLowerCase()}</text>
+          </g>
+        )}
+      </g>
+    </svg>
+  );
+}
+
+/* ---------- helpers ---------- */
+const NOTE_STYLE = {
+  n1: { bg: "#E5483A", icon: "alert", title: "t1" },
+  n2: { bg: "#E48A12", icon: "nav", title: "t2" },
+  n3: { bg: "#E48A12", icon: "pin", title: "t3" },
+  n4: { bg: "#2FB26B", icon: "check", title: "t4" },
+  sos: { bg: "#C8281C", icon: "alert", title: "sosAlert" }
+};
+const fmtTime = (d, lang) => d.toLocaleTimeString(lang === "ru" ? "ru-RU" : "kk-KZ", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const coordsOf = pos => ({ lat: 43.2385 - (pos.y - 200) * 0.00004, lng: 76.8897 + (pos.x - 200) * 0.00005 });
+
+function playAlarm() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; const ctx = new AC();
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = "square"; osc.connect(gain); gain.connect(ctx.destination);
+    const t0 = ctx.currentTime; gain.gain.setValueAtTime(0.0001, t0);
+    for (let i = 0; i < 6; i++) {
+      osc.frequency.setValueAtTime(i % 2 ? 660 : 990, t0 + i * 0.25);
+      gain.gain.setValueAtTime(0.18, t0 + i * 0.25);
+      gain.gain.setValueAtTime(0.0001, t0 + i * 0.25 + 0.22);
+    }
+    osc.start(t0); osc.stop(t0 + 1.55);
+    setTimeout(() => ctx.close && ctx.close(), 1800);
+  } catch (e) { /* audio unavailable */ }
+}
+
+/* ---------- small UI parts ---------- */
+const Toast = ({ n, t }) => {
+  const s = NOTE_STYLE[n.type];
+  return (
+    <div className="toast" style={{ background: s.bg }} role="alert">
+      <div className="mt-0.5 flex-none"><Icon n={s.icon} size={22} /></div>
+      <div className="min-w-0">
+        <div className="font-extrabold text-[13px] leading-tight">{t[s.title]} <span className="opacity-80 font-bold">· {t.now}</span></div>
+        <div className="text-[12px] font-semibold leading-snug mt-0.5">{n.type === "sos" ? t.sosBody : t[n.type]}</div>
+      </div>
+    </div>
+  );
+};
+
+const StatusBar = ({ light }) => (
+  <div className="statusbar" style={{ color: light ? "#fff" : "#173042" }}>
+    <span>9:41</span>
+    <span className="flex items-center gap-1.5"><span className="text-[11px]">5G</span><Icon n="battery" size={18} /></span>
+  </div>
+);
+
+/* ---------- Parent: map tab ---------- */
+function MapTab({ t, route, setRoute, pos, moving, battery, danger }) {
+  const [zoneInfo, setZoneInfo] = useState(null);
+  const zmap = { park: ["zSafe", "#2FB26B"], yard: ["zSafe", "#2FB26B"], cross: ["zWarn", "#B8860B"], danger: ["zDanger", "#E5483A"] };
+  const safe = route === "safe";
+  const facts = safe
+    ? [["bulb", t.light, t.lightV, "#139A8A"], ["cam", t.cam, t.camV, "#139A8A"], ["walk", t.ped, t.pedV, "#139A8A"]]
+    : [["bulb", t.light, t.lightF, "#E5483A"], ["cam", t.cam, t.camF, "#E5483A"], ["walk", t.ped, t.pedF, "#E5483A"]];
+  return (
+    <div className="scroll">
+      <div className="flex items-center justify-between py-2">
+        <div>
+          <div className="text-[19px] font-extrabold leading-tight">{t.mapTitle}</div>
+          <div className="text-[12px] font-semibold text-slate-500 flex items-center gap-1"><Icon n="pin" size={13} />{t.routeFrom}</div>
+        </div>
+        <div className="chip" style={{ background: "#D9F2EE", color: "#0B6B5F" }}><Icon n="battery" size={14} />{battery}%</div>
+      </div>
+      <div className="card !p-0 overflow-hidden relative">
+        <SafeMap t={t} route={route} pos={pos} moving={moving} battery={battery} showBubble danger={danger}
+                 onZone={k => setZoneInfo(zmap[k])} />
+        {zoneInfo && (
+          <button onClick={() => setZoneInfo(null)} className="absolute top-2 left-2 chip border-0 cursor-pointer"
+                  style={{ background: "#fff", color: zoneInfo[1], boxShadow: "0 1px 6px rgba(0,0,0,.2)" }}>
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: zoneInfo[1] }} />{t[zoneInfo[0]]}<Icon n="x" size={12} />
+          </button>
+        )}
+      </div>
+      <div className="flex gap-3 justify-center mt-2 text-[11px] font-bold text-slate-600">
+        {[["#2FB26B", t.zSafe], ["#F2B01E", t.zWarn], ["#E5483A", t.zDanger]].map(z => (
+          <span key={z[0]} className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: z[0] }} />{z[1]}</span>
+        ))}
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        {[["fast", t.fast, "12"], ["safe", t.safeRoute, "15"]].map(r => (
+          <button key={r[0]} onClick={() => setRoute(r[0])}
+            className="flex-1 rounded-2xl p-2.5 text-left cursor-pointer border-2"
+            style={{ background: route === r[0] ? (r[0] === "safe" ? "#D9F2EE" : "#FDE6E2") : "#fff",
+                     borderColor: route === r[0] ? (r[0] === "safe" ? "#139A8A" : "#F26B5B") : "#E3ECEF", font: "inherit", color: "#173042" }}>
+            <div className="flex items-center gap-1.5 font-extrabold text-[13px]"><Icon n={r[0] === "safe" ? "shield" : "nav"} size={15} />{r[1]}</div>
+            <div className="text-[12px] font-bold text-slate-500">{r[2]} {t.min}</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="card mt-3" style={{ borderLeft: "0" }}>
+        <div className="flex items-center gap-2 font-extrabold text-[14px]" style={{ color: safe ? "#0B6B5F" : "#C23A2C" }}>
+          <Icon n="bulb" size={17} />{t.aiTitle}
+        </div>
+        <p className="text-[12.5px] font-semibold text-slate-600 mt-1 mb-2 leading-snug">{safe ? t.aiSafe : t.aiFast}</p>
+        <div className="flex flex-col gap-1.5">
+          {facts.map(f => (
+            <div key={f[1]} className="flex items-center gap-2.5 text-[12.5px]">
+              <span className="w-7 h-7 rounded-full flex items-center justify-center flex-none" style={{ background: safe ? "#D9F2EE" : "#FDE6E2", color: f[3] }}><Icon n={f[0]} size={15} /></span>
+              <span className="font-extrabold">{f[1]}</span><span className="font-semibold text-slate-500 ml-auto text-right">{f[2]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Parent: events tab ---------- */
+function EventsTab({ t, lang, notes, fire }) {
+  const btns = [["n1", "e1", "alert", "#E5483A"], ["n2", "e2", "nav", "#E48A12"], ["n3", "e3", "pin", "#E48A12"], ["n4", "e4", "check", "#2FB26B"]];
+  return (
+    <div className="scroll">
+      <div className="text-[19px] font-extrabold py-2">{t.simTitle}</div>
+      <div className="grid grid-cols-2 gap-2">
+        {btns.map(b => (
+          <button key={b[0]} onClick={() => fire(b[0])} className="rounded-2xl p-3 text-left text-white cursor-pointer border-0 flex flex-col gap-2 min-h-[84px]"
+                  style={{ background: b[3], font: "inherit" }}>
+            <Icon n={b[2]} size={20} /><span className="font-extrabold text-[12.5px] leading-tight">{t[b[1]]}</span>
+          </button>
+        ))}
+      </div>
+      <div className="font-extrabold text-[15px] mt-4 mb-2 flex items-center gap-1.5"><Icon n="bell" size={16} />{t.history}</div>
+      {notes.length === 0 && <div className="card text-[12.5px] font-semibold text-slate-500">{t.empty}</div>}
+      <div className="flex flex-col gap-2">
+        {notes.map(n => { const s = NOTE_STYLE[n.type]; return (
+          <div key={n.id} className="card flex gap-2.5 items-start !p-2.5">
+            <span className="w-8 h-8 rounded-full flex items-center justify-center flex-none text-white" style={{ background: s.bg }}><Icon n={s.icon} size={16} /></span>
+            <div className="min-w-0">
+              <div className="font-extrabold text-[13px]">{t[s.title]}</div>
+              <div className="text-[12px] font-semibold text-slate-600 leading-snug">{n.type === "sos" ? t.sosBody : t[n.type]}</div>
+              <div className="text-[11px] font-bold text-slate-400 mt-0.5 flex items-center gap-1"><Icon n="clock" size={11} />{fmtTime(n.at, lang)}</div>
+            </div>
+          </div>); })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Parent: contacts tab ---------- */
+function ContactsTab({ t, contacts, setContacts, onCall }) {
+  const [name, setName] = useState(""), [phone, setPhone] = useState(""), [err, setErr] = useState(false);
+  const label = c => (c.key ? t[c.key] : c.name);
+  const add = e => {
+    e.preventDefault();
+    if (!name.trim() || !phone.trim()) { setErr(true); return; }
+    setContacts(cs => [...cs, { id: Date.now(), name: name.trim(), phone: phone.trim() }]);
+    setName(""); setPhone(""); setErr(false);
+  };
+  const colors = { mom: "#F26B5B", dad: "#3B82C4", grandma: "#9B6BD1", emergency: "#E5483A" };
+  return (
+    <div className="scroll">
+      <div className="text-[19px] font-extrabold py-2">{t.contacts}</div>
+      <div className="flex flex-col gap-2">
+        {contacts.map(c => (
+          <div key={c.id} className="card flex items-center gap-3 !p-2.5">
+            <span className="w-10 h-10 rounded-full flex items-center justify-center text-white font-extrabold flex-none"
+                  style={{ background: colors[c.key] || "#139A8A" }}>{c.key === "emergency" ? <Icon n="alert" size={19} /> : label(c)[0]}</span>
+            <div className="min-w-0 flex-1">
+              <div className="font-extrabold text-[14px] truncate">{label(c)}</div>
+              <div className="text-[12px] font-bold text-slate-500">{c.phone}</div>
+            </div>
+            <button onClick={() => onCall(label(c))} aria-label={t.call + " " + label(c)}
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white border-0 cursor-pointer"
+                    style={{ background: c.key === "emergency" ? "#E5483A" : "#2FB26B" }}><Icon n="phone" size={18} /></button>
+          </div>
+        ))}
+      </div>
+      <form onSubmit={add} className="card mt-3 flex flex-col gap-2">
+        <div className="font-extrabold text-[14px] flex items-center gap-1.5"><Icon n="plus" size={16} />{t.addTitle}</div>
+        <label htmlFor="cn" className="sr-only">{t.name}</label>
+        <input id="cn" value={name} onChange={e => setName(e.target.value)} placeholder={t.name} />
+        <label htmlFor="cp" className="sr-only">{t.phone}</label>
+        <input id="cp" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 7__ ___ __ __" inputMode="tel" />
+        {err && <div className="text-[12px] font-bold" style={{ color: "#E5483A" }}>{t.nameReq}</div>}
+        <button type="submit" className="rounded-xl text-white font-extrabold py-2.5 border-0 cursor-pointer" style={{ background: "#139A8A", font: "inherit", fontWeight: 800 }}>{t.add}</button>
+      </form>
+    </div>
+  );
+}
+
+/* ---------- Child screen ---------- */
+function ChildScreen({ t, pos, moving, contacts, onCall, onSOS }) {
+  const kin = contacts.filter(c => c.key === "mom" || c.key === "dad");
+  return (
+    <div className="scroll">
+      <div className="py-2">
+        <div className="text-[22px] font-extrabold leading-tight">{t.childHello}</div>
+        <div className="text-[13px] font-bold text-slate-500 flex items-center gap-1"><Icon n="shield" size={14} />{t.childSub}</div>
+      </div>
+      <div className="card !p-0 overflow-hidden">
+        <SafeMap t={t} route="safe" pos={pos} moving={moving} battery={84} showBubble={false} />
+      </div>
+      <div className="flex gap-2 mt-3">
+        {kin.map(c => (
+          <button key={c.id} onClick={() => onCall(t[c.key])} className="flex-1 rounded-2xl py-3 text-white border-0 cursor-pointer flex items-center justify-center gap-2"
+                  style={{ background: c.key === "mom" ? "#F26B5B" : "#3B82C4", font: "inherit", fontWeight: 800, fontSize: 16 }}>
+            <Icon n="phone" size={20} />{t[c.key]}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-col items-center mt-4 pb-2">
+        <button onClick={onSOS} className="sos rounded-full text-white border-0 cursor-pointer flex flex-col items-center justify-center"
+                style={{ width: 132, height: 132, background: "radial-gradient(circle at 35% 30%, #FF6A5A, #D8281C)", font: "inherit", fontWeight: 800, fontSize: 34 }}
+                aria-label="SOS">
+          <Icon n="alert" size={30} />SOS
+        </button>
+        <div className="text-[12px] font-bold text-slate-500 mt-3">{t.sosHold}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Overlays ---------- */
+const ChildSosScreen = ({ t, sos, lang, onCancel }) => (
+  <div className="overlay" style={{ background: "linear-gradient(#C8281C,#8E150D)" }}>
+    <div className="blink"><Icon n="alert" size={72} /></div>
+    <div className="text-[26px] font-extrabold mt-3 leading-tight">{t.sosOn}</div>
+    <p className="text-[15px] font-bold mt-2 opacity-90 leading-snug">{t.sosKid}</p>
+    <div className="mt-4 rounded-2xl px-4 py-2 text-[13px] font-bold" style={{ background: "rgba(255,255,255,.18)" }}>
+      {sos.lat.toFixed(5)}° N, {sos.lng.toFixed(5)}° E · {fmtTime(sos.at, lang)}
+    </div>
+    <button onClick={onCancel} className="mt-6 rounded-full px-6 py-3 font-extrabold border-0 cursor-pointer" style={{ background: "#fff", color: "#8E150D", font: "inherit", fontWeight: 800 }}>{t.cancel}</button>
+  </div>
+);
+
+const ParentSosModal = ({ t, sos, lang, onAck }) => (
+  <div className="overlay" style={{ background: "rgba(90,10,6,.88)" }} role="alertdialog" aria-label={t.sosAlert}>
+    <div className="w-full rounded-3xl p-5 text-left" style={{ background: "#fff", color: "#173042" }}>
+      <div className="flex items-center gap-3 text-[#C8281C]">
+        <span className="blink"><Icon n="alert" size={40} /></span>
+        <div><div className="text-[22px] font-extrabold leading-none">{t.sosAlert}</div><div className="text-[13px] font-bold text-slate-600 mt-1">{t.child_name} · {t.sosBody}</div></div>
+      </div>
+      <div className="mt-4 rounded-2xl p-3" style={{ background: "#FDE6E2" }}>
+        <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1"><Icon n="pin" size={12} />{t.coords}</div>
+        <div className="text-[18px] font-extrabold mt-0.5 tabular-nums">{sos.lat.toFixed(5)}° N</div>
+        <div className="text-[18px] font-extrabold tabular-nums">{sos.lng.toFixed(5)}° E</div>
+      </div>
+      <div className="mt-2 rounded-2xl p-3 flex items-center gap-2" style={{ background: "#F1F6F8" }}>
+        <Icon n="clock" size={16} /><span className="text-[12px] font-extrabold uppercase tracking-wider text-slate-500">{t.time}</span>
+        <span className="ml-auto font-extrabold tabular-nums">{fmtTime(sos.at, lang)}</span>
+      </div>
+      <button onClick={onAck} className="w-full mt-4 rounded-2xl py-3 text-white font-extrabold border-0 cursor-pointer flex items-center justify-center gap-2"
+              style={{ background: "#C8281C", font: "inherit", fontWeight: 800, fontSize: 15 }}><Icon n="phone" size={18} />{t.ack}</button>
+    </div>
+  </div>
+);
+
+const CallOverlay = ({ t, who, onEnd }) => (
+  <div className="overlay" style={{ background: "linear-gradient(#173042,#0E1B24)" }}>
+    <div className="w-24 h-24 rounded-full flex items-center justify-center text-[40px] font-extrabold blink" style={{ background: "#139A8A" }}>{who[0]}</div>
+    <div className="text-[24px] font-extrabold mt-4">{t.calling}: {who}</div>
+    <div className="text-[14px] font-bold opacity-70 mt-1">{t.callingSub}</div>
+    <button onClick={onEnd} aria-label={t.end} className="mt-10 w-16 h-16 rounded-full border-0 cursor-pointer text-white flex items-center justify-center" style={{ background: "#E5483A" }}>
+      <span style={{ transform: "rotate(135deg)", display: "flex" }}><Icon n="phone" size={26} /></span>
+    </button>
+    <div className="text-[12px] font-bold opacity-70 mt-2">{t.end}</div>
+  </div>
+);
+
+/* ---------- App ---------- */
+const DEFAULT_CONTACTS = [
+  { id: 1, key: "mom", phone: "+7 701 234 56 78" }, { id: 2, key: "dad", phone: "+7 702 345 67 89" },
+  { id: 3, key: "grandma", phone: "+7 707 456 78 90" }, { id: 4, key: "emergency", phone: "112" }
+];
+const RUN_MS = 14000;
+
+function App() {
+  const [lang, setLang] = useState("ru"), [role, setRole] = useState("parent"), [tab, setTab] = useState("map");
+  const [route, setRoute] = useState("safe");
+  const [pos, setPos] = useState({ x: SCHOOL[0], y: SCHOOL[1] });
+  const [running, setRunning] = useState(false), [danger, setDanger] = useState(false);
+  const [notes, setNotes] = useState([]), [toast, setToast] = useState(null);
+  const [contacts, setContacts] = useState(DEFAULT_CONTACTS);
+  const [sos, setSos] = useState(null), [call, setCall] = useState(null);
+  const [scale, setScale] = useState(1);
+  const t = T[lang];
+  const routeRef = useRef(route); routeRef.current = route;
+  const raf = useRef(0), toastTimer = useRef(0);
+
+  useEffect(() => {
+    const fit = () => setScale(Math.min(1, (window.innerWidth - 32) / 410));
+    fit(); window.addEventListener("resize", fit); return () => window.removeEventListener("resize", fit);
+  }, []);
+
+  const notify = type => {
+    const n = { id: Date.now() + Math.random(), type, at: new Date() };
+    setNotes(ns => [n, ...ns]); setToast(n);
+    clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 4500);
+  };
+
+  const stopRun = () => { cancelAnimationFrame(raf.current); setRunning(false); };
+  const startRun = () => {
+    cancelAnimationFrame(raf.current); setRunning(true); setDanger(false);
+    const t0 = performance.now();
+    const step = now => {
+      const k = Math.min(1, (now - t0) / RUN_MS);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      setPos(pointAt(ROUTES[routeRef.current].pts, e));
+      if (k < 1) raf.current = requestAnimationFrame(step); else setRunning(false);
+    };
+    raf.current = requestAnimationFrame(step);
+  };
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+
+  const fire = type => {
+    stopRun(); setDanger(false);
+    if (type === "n1") { setPos({ x: 200, y: 205 }); setDanger(true); }
+    if (type === "n2") setPos({ x: 200, y: 112 });
+    if (type === "n3") setPos({ x: 228, y: 376 });
+    if (type === "n4") setPos({ x: SCHOOL[0] + 22, y: SCHOOL[1] + 22 });
+    notify(type);
+  };
+
+  const triggerSOS = () => {
+    playAlarm();
+    const c = coordsOf(pos);
+    setSos({ lat: c.lat, lng: c.lng, at: new Date(), acked: false });
+    setNotes(ns => [{ id: Date.now(), type: "sos", at: new Date() }, ...ns]);
+  };
+  const cancelSOS = () => setSos(null);
+
+  const tabs = [["map", "tabMap", "map"], ["events", "tabEvents", "bell"], ["contacts", "tabContacts", "phone"]];
+  const sosParent = role === "parent" && sos && !sos.acked;
+  const sosChild = role === "child" && sos;
+
+  return (
+    <>
+      <div className="demo-bar" role="toolbar">
+        <div className="seg">
+          <button className={role === "parent" ? "on" : ""} onClick={() => setRole("parent")}>{t.parent}</button>
+          <button className={role === "child" ? "on" : ""} onClick={() => setRole("child")}>{t.child}</button>
+        </div>
+        <div className="seg">
+          <button className={lang === "ru" ? "on" : ""} onClick={() => setLang("ru")}>РУС</button>
+          <button className={lang === "kk" ? "on" : ""} onClick={() => setLang("kk")}>ҚАЗ</button>
+        </div>
+        <button className={"go" + (running ? " stop" : "")} onClick={running ? stopRun : startRun}>
+          <Icon n={running ? "stop" : "play"} size={13} fill="currentColor" sw={1} />{running ? t.stop : t.run}
+        </button>
+      </div>
+
+      <div style={{ width: 410 * scale, height: 864 * scale }}>
+        <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: 410, height: 864 }}>
+          <div className="phone" style={{ maxWidth: "none" }}>
+            <StatusBar />
+            {toast && <Toast key={toast.id} n={toast} t={t} />}
+            {role === "parent" ? (
+              <>
+                {tab === "map" && <MapTab t={t} route={route} setRoute={setRoute} pos={pos} moving={running} battery={84} danger={danger} />}
+                {tab === "events" && <EventsTab t={t} lang={lang} notes={notes} fire={fire} />}
+                {tab === "contacts" && <ContactsTab t={t} contacts={contacts} setContacts={setContacts} onCall={setCall} />}
+                <nav className="tabbar">
+                  {tabs.map(x => (
+                    <button key={x[0]} className={tab === x[0] ? "on" : ""} onClick={() => setTab(x[0])}>
+                      <Icon n={x[2]} size={21} />{t[x[1]]}
+                    </button>
+                  ))}
+                </nav>
+              </>
+            ) : (
+              <ChildScreen t={t} pos={pos} moving={running} contacts={contacts} onCall={setCall} onSOS={triggerSOS} />
+            )}
+            {sosChild && <ChildSosScreen t={t} sos={sos} lang={lang} onCancel={cancelSOS} />}
+            {sosParent && <ParentSosModal t={t} sos={sos} lang={lang} onAck={() => { setSos(s => ({ ...s, acked: true })); setCall(t.mom); }} />}
+            {call && <CallOverlay t={t} who={call} onEnd={() => setCall(null)} />}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
